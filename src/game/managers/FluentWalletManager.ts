@@ -1,5 +1,5 @@
 import { Address, createPublicClient, createWalletClient, custom, formatEther, parseEther } from 'viem';
-import { mainnet } from 'viem/chains';
+import { confluxESpace } from 'viem/chains';
 import { BaseWalletManager } from './BaseWalletManager';
 
 declare const window: any;
@@ -10,6 +10,20 @@ export class FluentWalletManager extends BaseWalletManager {
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
         this.fluent = window.fluent && window.fluent.isFluent ? window.fluent : null;
+    }
+
+    async getTransactionReceipt(txHash: string) {
+        if (!this.publicClient || !this.currentAccount) {
+            console.error('Public client is not initialized or no account found.');
+            this.game.events.emit('fluentError', 'Public client not initialized or no account.');
+            return null;
+        }
+
+        return await this.publicClient.getTransactionReceipt(txHash)
+    }
+
+    getChainInfo() {
+        return confluxESpace
     }
 
     isWalletInstalled(): boolean {
@@ -25,7 +39,7 @@ export class FluentWalletManager extends BaseWalletManager {
 
         try {
             this.publicClient = createPublicClient({ transport: custom(this.fluent) });
-            this.walletClient = createWalletClient({ chain: mainnet, transport: custom(this.fluent) });
+            this.walletClient = createWalletClient({ chain: confluxESpace, transport: custom(this.fluent) });
             const accounts = await this.walletClient.requestAddresses();
             if (accounts.length === 0) {
                 console.error('No accounts found');
@@ -39,7 +53,7 @@ export class FluentWalletManager extends BaseWalletManager {
 
             console.log('Connected to Fluent:', this.currentAccount, this.currentChainId);
             this.setupListeners();
-            await this.walletClient.switchChain({ id: mainnet.id });
+            await this.walletClient.switchChain({ id: confluxESpace.id });
 
             this.game.events.emit('walletConnected', this.currentAccount, this.currentChainId);
             return this.currentAccount as Address;
@@ -133,7 +147,7 @@ export class FluentWalletManager extends BaseWalletManager {
             this.currentChainId = chainId;
             console.log('Network changed:', this.currentChainId);
 
-            await this.walletClient?.switchChain({ id: mainnet.id });
+            await this.walletClient?.switchChain({ id: confluxESpace.id });
 
             this.game.events.emit('chainChanged', this.currentChainId);
         });

@@ -24,6 +24,11 @@ export class MainMenu extends Scene {
         this.activeCalls = {};
     }
 
+    preload ()
+    {
+        this.load.plugin('WalletPlugin', WalletPlugin, true);
+    }
+
     async create() {
         this.walletPlugin = this.plugins.get('WalletPlugin') as WalletPlugin;
         console.log(this.walletPlugin)
@@ -84,7 +89,7 @@ export class MainMenu extends Scene {
 
     // Handle wallet connection and update UI based on status
     private async handleWalletConnection() {
-        this.walletPlugin.setCurrentManager('MetaMask')
+        this.walletPlugin.setCurrentManager('Fluent')
         if (this.walletPlugin.isWalletInstalled()) {
             if (this.walletPlugin.currentAccount) {
                 await this.executeWithLoading('disconnectWallet', 'Disconnecting...', async () => {
@@ -108,7 +113,7 @@ export class MainMenu extends Scene {
         this.updateAccountInfo(account);
         if (account) {
             this.updateBalanceInfo();
-            this.updateChainInfo(this.walletPlugin.targetChain);
+            this.updateChainInfo(this.walletPlugin.getChainInfo());
         } else {
             this.updateBalance(null);
             this.updateChainInfo(null);
@@ -184,7 +189,7 @@ export class MainMenu extends Scene {
     }
 
     // Update the displayed account information
-    updateAccountInfo(account: Address | undefined) {
+    updateAccountInfo(account: Address | null) {
         if (account) {
             this.accountText.setText(`Account: ${account}`);
             this.connectText.setText('Disconnect Wallet');
@@ -247,7 +252,7 @@ export class MainMenu extends Scene {
                 }));
                 break;
             case 'sendTransaction':
-                const account = this.walletPlugin.getAccount();
+                const account = await this.walletPlugin.getAccount();
                 if (account) {
                     await this.executeWithLoading('sendTransaction', 'Sending...', () => this.walletPlugin.sendTransaction(account, "1"));
                 }

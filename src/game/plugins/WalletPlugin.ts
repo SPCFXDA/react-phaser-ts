@@ -11,6 +11,7 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
     private fluentWalletManager: FluentWalletManager;
     private currentManager: WalletManager | null = null;
     currentAccount: Address | null;
+
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
         this.metaMaskWalletManager = new MetaMaskWalletManager(pluginManager);
@@ -30,9 +31,14 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
         }
     }
 
-    isWalletInstalled(): boolean | undefined{
+    getChainInfo() {
         this.ensureManagerSet();
-        return this.currentManager?.isWalletInstalled()
+        return this.currentManager?.getChainInfo();
+    }
+
+    isWalletInstalled(): boolean | undefined {
+        this.ensureManagerSet();
+        return this.currentManager?.isWalletInstalled();
     }
 
     // Helper method to ensure a manager is set
@@ -46,12 +52,13 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
 
     async connect(): Promise<Address | null> {
         this.ensureManagerSet();
-        this.currentAccount = await this.currentManager?.connect() as unknown as Address
+        this.currentAccount = await this.currentManager?.connect() as unknown as Address;
         return this.currentAccount;
     }
 
     async disconnectWallet(): Promise<void> {
         this.ensureManagerSet();
+        this.currentAccount = null;
         return this.currentManager?.disconnectWallet();
     }
 
@@ -62,13 +69,25 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
 
     async getBalance(): Promise<string | null> {
         this.ensureManagerSet();
-        const balance = this.currentManager?.getBalance();
-        return  balance || null;
+        const balance = await this.currentManager?.getBalance();
+        return balance || null;
     }
 
     async sendTransaction(toAddress: Address, amount: string): Promise<string> {
         this.ensureManagerSet();
-        return this.currentManager?.sendTransaction(toAddress, amount)+'';
+        
+        // Initiate the transaction
+        const txHash = await this.currentManager?.sendTransaction(toAddress, amount);
+        if (!txHash) {
+            throw new Error('Transaction initiation failed');
+        }
+        
+        // Wait for the transaction to be confirmed
+        console.log(`Transaction initiated, waiting for confirmation. TxHash: ${txHash}`);
+        const receipt = await this.waitForTransactionConfirmation(txHash);
+        console.log(`Transaction confirmed! Receipt:`, receipt);
+        
+        return txHash;
     }
 
     async getBlockNumber(): Promise<number> {
@@ -76,10 +95,21 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
         return this.currentManager?.getBlockNumber();
     }
 
-    // async switchNetwork(chainId: string): Promise<void> {
-    //     this.ensureManagerSet();
-    //     return this.currentManager?.switchNetwork(chainId);
-    // }
+    // Method to wait for the transaction confirmation
+    private async waitForTransactionConfirmation(txHash: string): Promise<any> {
+        this.ensureManagerSet();
+
+        // Simulating waiting for the transaction to be mined and confirmed
+        while (true) {
+            const receipt = await this.currentManager?.getTransactionReceipt(txHash);
+            if (receipt && receipt.status) {
+                return receipt;
+            }
+
+            // Sleep or wait for a while before checking again (to avoid busy-waiting)
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+        }
+    }
 
     // Methods to get the specific wallet managers
     getMetaMaskWalletManager(): MetaMaskWalletManager {

@@ -12,6 +12,20 @@ export class MetaMaskWalletManager extends BaseWalletManager {
         this.metamask = window.ethereum && window.ethereum.isMetaMask ? window.ethereum : null;
     }
 
+    async getTransactionReceipt(txHash: string) {
+        if (!this.publicClient || !this.currentAccount) {
+            console.error('Public client is not initialized or no account found.');
+            this.game.events.emit('metaMaskError', 'Public client not initialized or no account.');
+            return null;
+        }
+
+        return await this.publicClient.getTransactionReceipt(txHash)
+    }
+
+    getChainInfo() {
+        return confluxESpace
+    }
+
     isWalletInstalled(): boolean {
         return !!this.metamask;
     }

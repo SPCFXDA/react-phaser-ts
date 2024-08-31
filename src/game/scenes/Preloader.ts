@@ -1,5 +1,4 @@
 import { Scene } from 'phaser';
-import { WalletPlugin } from '../plugins/WalletPlugin';
 
 export class Preloader extends Scene
 {
@@ -36,7 +35,6 @@ export class Preloader extends Scene
 
         this.load.image('logo', 'logo.png');
         this.load.image('star', 'star.png');
-        this.load.plugin('WalletManager', WalletPlugin, true);
     }
 
     create ()
