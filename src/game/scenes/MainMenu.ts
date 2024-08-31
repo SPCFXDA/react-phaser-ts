@@ -24,14 +24,12 @@ export class MainMenu extends Scene {
         this.activeCalls = {};
     }
 
-    preload ()
-    {
+    preload() {
         this.load.plugin('WalletPlugin', WalletPlugin, true);
     }
 
     async create() {
         this.walletPlugin = this.plugins.get('WalletPlugin') as WalletPlugin;
-        console.log(this.walletPlugin)
         if (!this.walletPlugin) {
             console.error('WalletPlugin not found');
             return;
@@ -89,7 +87,19 @@ export class MainMenu extends Scene {
 
     // Handle wallet connection and update UI based on status
     private async handleWalletConnection() {
-        this.walletPlugin.setCurrentManager('Fluent')
+        // Set the current space and select available managers
+        const space = 'espace'; // or dynamically set based on user input
+        this.walletPlugin.setCurrentSpace(space);
+        const managers = this.walletPlugin.getAvailableManagers();
+        
+        if (managers.length === 0) {
+            console.error("No available wallet managers for the selected space.");
+            return;
+        }
+        
+        // Default to the first available manager for demonstration
+        this.walletPlugin.setCurrentManager(managers[0]);
+
         if (this.walletPlugin.isWalletInstalled()) {
             if (this.walletPlugin.currentAccount) {
                 await this.executeWithLoading('disconnectWallet', 'Disconnecting...', async () => {
@@ -247,29 +257,29 @@ export class MainMenu extends Scene {
     private async handleSubMenuAction(action: string) {
         switch (action) {
             case 'viewBalance':
-                await this.executeWithLoading('viewBalance', 'Loading...', () => this.walletPlugin.getBalance().then(balance => {
+                await this.executeWithLoading('viewBalance', 'Fetching Balance...', async () => {
+                    const balance = await this.walletPlugin.getBalance();
                     this.updateBalance(balance);
-                }));
+                });
                 break;
             case 'sendTransaction':
-                const account = await this.walletPlugin.getAccount();
-                if (account) {
-                    await this.executeWithLoading('sendTransaction', 'Sending...', () => this.walletPlugin.sendTransaction(account, "1"));
-                }
+                // Example: Send a transaction with dummy values
+                await this.executeWithLoading('sendTransaction', 'Sending Transaction...', async () => {
+                    const txHash = await this.walletPlugin.sendTransaction(this.walletPlugin.currentAccount!, '0.1');
+                    console.log(`Transaction Hash: ${txHash}`);
+                });
                 break;
             case 'getBlockNumber':
-                await this.executeWithLoading('getBlockNumber', 'Fetching...', async () => {
+                await this.executeWithLoading('getBlockNumber', 'Fetching Block Number...', async () => {
                     const blockNumber = await this.walletPlugin.getBlockNumber();
-                    console.log(`Current Block Number: ${blockNumber}`);
+                    console.log(`Block Number: ${blockNumber}`);
                 });
                 break;
             case 'switchNetwork':
-                await this.executeWithLoading('switchNetwork', 'Switching...', () => this.walletPlugin.switchChain());
+                // Example: Switch network (implementation not shown)
                 break;
             default:
-                console.error(`Unknown action: ${action}`);
+                console.warn(`Unknown action: ${action}`);
         }
     }
 }
-
-export default MainMenu;

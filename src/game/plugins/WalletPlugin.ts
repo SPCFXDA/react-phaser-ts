@@ -1,34 +1,65 @@
 import Phaser from 'phaser';
-import { MetaMaskWalletManager } from '../managers/MetaMaskWalletManager';
-import { FluentWalletManager } from '../managers/FluentWalletManager';
+import { MetaMaskWalletManager } from '../managers/MetaMaskWalletManager_espace';
+import { FluentWalletManager } from '../managers/FluentWalletManager_espace';
+import { FluentWalletManagerCore } from '../managers/FluentWalletManager_core';
 import { Address } from 'viem';
 
 // Define a type union for wallet managers
-type WalletManager = MetaMaskWalletManager | FluentWalletManager;
+type WalletManager = MetaMaskWalletManager | FluentWalletManager | FluentWalletManagerCore;
 
 export class WalletPlugin extends Phaser.Plugins.BasePlugin {
     private metaMaskWalletManager: MetaMaskWalletManager;
     private fluentWalletManager: FluentWalletManager;
+    private fluentWalletManagerCore: FluentWalletManagerCore;
     private currentManager: WalletManager | null = null;
+    private currentSpace: 'core' | 'espace' | null;
     currentAccount: Address | null;
+    private spaceManagers: { [key: string]: WalletManager[] };
 
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
         this.metaMaskWalletManager = new MetaMaskWalletManager(pluginManager);
         this.fluentWalletManager = new FluentWalletManager(pluginManager);
+        this.fluentWalletManagerCore = new FluentWalletManagerCore(pluginManager);
         this.currentAccount = null;
+        this.currentSpace = null;
+
+        this.spaceManagers = {
+            espace: [this.metaMaskWalletManager, this.fluentWalletManager],
+            core: [this.fluentWalletManagerCore]
+        };
+    }
+
+    // Get available spaces
+    getAvailableSpaces(): string[] {
+        return Object.keys(this.spaceManagers);
+    }
+
+    // Set the current space and update the currentManager based on it
+    setCurrentSpace(space: 'core' | 'espace'): void {
+        if (space in this.spaceManagers) {
+            this.currentSpace = space;
+        } else {
+            throw new Error('Invalid space type');
+        }
+        console.log(`Current space set to: ${this.currentSpace}`);
+    }
+
+    // Get available managers for the selected space
+    getAvailableManagers(): WalletManager[] {
+        if (!this.currentSpace) {
+            throw new Error('No space selected. Please set the current space first.');
+        }
+        return this.spaceManagers[this.currentSpace];
     }
 
     // Set the current manager (MetaMask or Fluent)
-    setCurrentManager(manager: 'MetaMask' | 'Fluent'): void {
-        if (manager === 'MetaMask') {
-            this.currentManager = this.metaMaskWalletManager;
-        } else if (manager === 'Fluent') {
-            this.currentManager = this.fluentWalletManager;
-        } else {
-            this.currentManager = this.metaMaskWalletManager;
-            // throw new Error('Invalid wallet manager type');
+    setCurrentManager(manager: WalletManager): void {
+        if (!this.currentSpace || !this.spaceManagers[this.currentSpace].includes(manager)) {
+            throw new Error('Invalid or unavailable wallet manager type');
         }
+        this.currentManager = manager;
+        console.log(`Current manager set to: ${manager.constructor.name}`);
     }
 
     getChainInfo() {
@@ -118,5 +149,9 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
 
     getFluentWalletManager(): FluentWalletManager {
         return this.fluentWalletManager;
+    }
+
+    getFluentWalletManagerCore(): FluentWalletManagerCore {
+        return this.fluentWalletManagerCore;
     }
 }
