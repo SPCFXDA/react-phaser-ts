@@ -1,16 +1,18 @@
 import { GameObjects, Scene } from 'phaser';
-import WalletManager from '../plugins/WalletManager';
 import { EventBus } from '../EventBus';
 import { Address } from 'viem';
+import { WalletPlugin } from '../plugins/WalletPlugin';
 
 export class MainMenu extends Scene {
-    private walletManager: WalletManager;
+    private walletPlugin: WalletPlugin;
     private accountText: Phaser.GameObjects.Text;
     private balanceText: Phaser.GameObjects.Text;
     private connectText: Phaser.GameObjects.Text;
-    private chainInfoText: Phaser.GameObjects.Text;  // New text object for chain information
+    private chainInfoText: Phaser.GameObjects.Text;
     private submenu: Phaser.GameObjects.Container;
-    
+    private isLoading: boolean;
+    private activeCalls: Record<string, boolean>;
+
     background: GameObjects.Image;
     logo: GameObjects.Image;
     title: GameObjects.Text;
@@ -18,25 +20,35 @@ export class MainMenu extends Scene {
 
     constructor() {
         super('MainMenu');
+        this.isLoading = false;
+        this.activeCalls = {};
     }
 
     async create() {
-        // Initialize WalletManager
-        this.walletManager = this.plugins.get('WalletManager') as WalletManager;
-        this.walletManager.init();
+        this.walletPlugin = this.plugins.get('WalletPlugin') as WalletPlugin;
+        console.log(this.walletPlugin)
+        if (!this.walletPlugin) {
+            console.error('WalletPlugin not found');
+            return;
+        }
 
-        // Set background image
+        this.setupUI();
+        this.setupEventListeners();
+
+        EventBus.emit('current-scene-ready', this);
+    }
+
+    // Set up all UI elements
+    private setupUI() {
         this.background = this.add.image(512, 384, 'background');
 
-        // Create "Connect MetaMask" button
-        this.connectText = this.add.text(100, 100, 'Connect MetaMask', {
+        this.connectText = this.add.text(100, 100, 'Connect Wallet', {
             fontSize: '20px',
             backgroundColor: '#333',
             color: '#000',
             padding: { x: 10, y: 5 }
         }).setInteractive();
 
-        // Placeholder for displaying the current account and balance
         this.accountText = this.add.text(100, 150, 'Account: Not connected', {
             fontSize: '20px',
             backgroundColor: '#333',
@@ -51,7 +63,6 @@ export class MainMenu extends Scene {
             padding: { x: 10, y: 5 }
         });
 
-        // New text object for displaying chain info
         this.chainInfoText = this.add.text(100, 250, 'Chain: N/A', {
             fontSize: '18px',
             backgroundColor: '#444',
@@ -59,57 +70,135 @@ export class MainMenu extends Scene {
             padding: { x: 10, y: 5 }
         });
 
-        // Create submenu container, initially hidden
         this.submenu = this.add.container(100, 350);
         this.createSubmenu();
-        this.submenu.setVisible(false); // Hide until connected
+        this.submenu.setVisible(false);
+    }
 
-        // Connect button event listener
-        this.connectText.on('pointerdown', async () => {
-            if (this.walletManager.isMetaMaskInstalled()) {
-                if (this.walletManager.getAccount()) {
-                    // Disconnect wallet if already connected
-                    this.walletManager.disconnectWallet();
-                    this.updateAccountInfo(undefined);
-                    this.updateBalance(null);
-                    this.updateChainInfo(null);
-                } else {
-                    // Connect wallet
-                    const account = await this.walletManager.connect();
-                    this.updateAccountInfo(account);   
-                    const balance = await this.walletManager.getBalance();
-                    this.updateBalance(balance);
-                    this.updateChainInfo(this.walletManager.targetChain);
-                }
+    // Set up event listeners for UI interactions
+    private setupEventListeners() {
+        this.connectText.on('pointerdown', () => this.handleWalletConnection());
+
+        EventBus.on('wallet-connection-changed', () => this.updateUIWithWalletStatus());
+    }
+
+    // Handle wallet connection and update UI based on status
+    private async handleWalletConnection() {
+        this.walletPlugin.setCurrentManager('MetaMask')
+        if (this.walletPlugin.isWalletInstalled()) {
+            if (this.walletPlugin.currentAccount) {
+                await this.executeWithLoading('disconnectWallet', 'Disconnecting...', async () => {
+                    await this.walletPlugin.disconnectWallet();
+                    this.updateUIWithWalletStatus();
+                });
             } else {
-                console.error("MetaMask is not installed");
+                await this.executeWithLoading('connectWallet', 'Connecting...', async () => {
+                    await this.walletPlugin.connect();
+                    this.updateUIWithWalletStatus();
+                });
             }
-        });
+        } else {
+            console.error("Wallet is not installed");
+        }
+    }
 
-        // Emit event when scene is ready
-        EventBus.emit('current-scene-ready', this);
+    // Update the UI to reflect the current wallet status
+    private updateUIWithWalletStatus() {
+        const account = this.walletPlugin.currentAccount;
+        this.updateAccountInfo(account);
+        if (account) {
+            this.updateBalanceInfo();
+            this.updateChainInfo(this.walletPlugin.targetChain);
+        } else {
+            this.updateBalance(null);
+            this.updateChainInfo(null);
+        }
+    }
+
+    // Method to update balance info
+    private async updateBalanceInfo() {
+        const balance = await this.walletPlugin.getBalance();
+        this.updateBalance(balance);
+    }
+
+    // Wrap wallet operations with global loading status and button text updates
+    async executeWithLoading<T>(callName: string, buttonTextOnStart: string, callback: () => Promise<T>): Promise<T | undefined> {
+        try {
+            this.isLoading = true;
+            this.activeCalls[callName] = true;
+            this.updateGlobalLoadingStatus();
+            this.updateButtonText(callName, buttonTextOnStart);
+
+            const result = await callback();
+            return result;
+        } catch (error) {
+            console.error(`${callName} failed:`, error);
+            return undefined;
+        } finally {
+            this.activeCalls[callName] = false;
+            this.isLoading = Object.values(this.activeCalls).some(call => call === true);
+            this.updateGlobalLoadingStatus();
+            this.updateButtonText(callName, this.getButtonDefaultText(callName));
+        }
+    }
+
+    // Update the global loading status display
+    updateGlobalLoadingStatus() {
+        if (this.isLoading) {
+            console.log('Loading...');
+        } else {
+            console.log('Loading complete');
+        }
+    }
+
+    // Update button text based on the call name
+    updateButtonText(callName: string, text: string) {
+        const button = this.getButtonByName(callName);
+        if (button) button.setText(text);
+    }
+
+    // Retrieve a button by its associated name
+    getButtonByName(name: string): Phaser.GameObjects.Text | null {
+        const buttons = {
+            viewBalance: this.submenu.getAt(0),
+            sendTransaction: this.submenu.getAt(1),
+            getBlockNumber: this.submenu.getAt(2),
+            switchNetwork: this.submenu.getAt(3),
+            connectWallet: this.connectText,
+            disconnectWallet: this.connectText
+        };
+        return buttons[name] as Phaser.GameObjects.Text || null;
+    }
+
+    // Get default text for each button
+    getButtonDefaultText(name: string): string {
+        const defaultTexts = {
+            viewBalance: 'View Balance',
+            sendTransaction: 'Send Transaction',
+            getBlockNumber: 'Get Block Number',
+            switchNetwork: 'Switch Network',
+            connectWallet: 'Connect Wallet',
+            disconnectWallet: 'Disconnect Wallet'
+        };
+        return defaultTexts[name] || '';
     }
 
     // Update the displayed account information
     updateAccountInfo(account: Address | undefined) {
         if (account) {
             this.accountText.setText(`Account: ${account}`);
-            this.connectText.setText('Disconnect MetaMask');
-            this.submenu.setVisible(true);  // Show submenu when connected
+            this.connectText.setText('Disconnect Wallet');
+            this.submenu.setVisible(true);
         } else {
             this.accountText.setText('Account: Not connected');
-            this.connectText.setText('Connect MetaMask');
-            this.submenu.setVisible(false); // Hide submenu when disconnected
+            this.connectText.setText('Connect Wallet');
+            this.submenu.setVisible(false);
         }
     }
 
     // Update the displayed balance
     updateBalance(balance: string | null) {
-        if (balance) {
-            this.balanceText.setText(`Balance: ${balance} CFX`);
-        } else {
-            this.balanceText.setText('Balance: N/A');
-        }
+        this.balanceText.setText(balance ? `Balance: ${balance} CFX` : 'Balance: N/A');
     }
 
     // Update the displayed chain information
@@ -128,133 +217,54 @@ export class MainMenu extends Scene {
     }
 
     // Create submenu with additional wallet options
-// Create submenu with additional wallet options
-createSubmenu() {
-    const viewBalanceButton = this.add.text(0, 0, 'View Balance', {
-        fontSize: '18px',
-        backgroundColor: '#444',
-        color: '#fff',
-        padding: { x: 8, y: 5 }
-    }).setInteractive();
+    createSubmenu() {
+        const buttons = [
+            { text: 'View Balance', event: 'viewBalance' },
+            { text: 'Send Transaction', event: 'sendTransaction' },
+            { text: 'Get Block Number', event: 'getBlockNumber' },
+            { text: 'Switch Network', event: 'switchNetwork' }
+        ];
 
-    const sendTransactionButton = this.add.text(0, 40, 'Send Transaction', {
-        fontSize: '18px',
-        backgroundColor: '#444',
-        color: '#fff',
-        padding: { x: 8, y: 5 }
-    }).setInteractive();
+        buttons.forEach((buttonConfig, index) => {
+            const button = this.add.text(0, index * 40, buttonConfig.text, {
+                fontSize: '18px',
+                backgroundColor: '#444',
+                color: '#fff',
+                padding: { x: 8, y: 5 }
+            }).setInteractive();
 
-    const getBlockNumberButton = this.add.text(0, 80, 'Get Block Number', {
-        fontSize: '18px',
-        backgroundColor: '#444',
-        color: '#fff',
-        padding: { x: 8, y: 5 }
-    }).setInteractive();
-
-    const switchNetworkButton = this.add.text(0, 120, 'Switch Network', {
-        fontSize: '18px',
-        backgroundColor: '#444',
-        color: '#fff',
-        padding: { x: 8, y: 5 }
-    }).setInteractive();
-
-    // Add submenu items to container
-    this.submenu.add([viewBalanceButton, sendTransactionButton, getBlockNumberButton, switchNetworkButton]);
-
-    // Logic to display balance when "View Balance" is clicked
-    viewBalanceButton.on('pointerdown', async () => {
-        const originalText = viewBalanceButton.text;  // Save original button text
-        viewBalanceButton.setText('Loading...');      // Set button to loading
-        try {
-            const balance = await this.walletManager.getBalance();
-            this.updateBalance(balance);
-        } catch (error) {
-            console.error('Error fetching balance:', error);
-        } finally {
-            viewBalanceButton.setText(originalText);  // Reset button text after interaction
-        }
-    });
-
-    // Logic to send a transaction when "Send Transaction" is clicked
-    sendTransactionButton.on('pointerdown', async () => {
-        const originalText = sendTransactionButton.text;  // Save original button text
-        sendTransactionButton.setText('Loading...');      // Set button to loading
-        try {
-            const toAccount = this.walletManager.getAccount();
-            if (toAccount) {
-                const txnHash = await this.walletManager.sendTransaction(toAccount, "1");
-                console.log(`Transaction hash: ${txnHash}`);
-            }
-        } catch (error) {
-            console.error('Error sending transaction:', error);
-        } finally {
-            sendTransactionButton.setText(originalText);  // Reset button text after interaction
-        }
-    });
-
-    // Logic to get block number when "Get Block Number" is clicked
-    getBlockNumberButton.on('pointerdown', async () => {
-        const originalText = getBlockNumberButton.text;  // Save original button text
-        getBlockNumberButton.setText('Loading...');      // Set button to loading
-        try {
-            const blockNumber = await this.walletManager.getBlockNumber();
-            console.log(`Current block number: ${blockNumber}`);
-        } catch (error) {
-            console.error('Error fetching block number:', error);
-        } finally {
-            getBlockNumberButton.setText(originalText);  // Reset button text after interaction
-        }
-    });
-
-    // Logic to switch network when "Switch Network" is clicked
-    switchNetworkButton.on('pointerdown', async () => {
-        const originalText = switchNetworkButton.text;  // Save original button text
-        switchNetworkButton.setText('Loading...');      // Set button to loading
-        try {
-            await this.walletManager.switchNetwork(this.walletManager.targetChain.id);
-            console.log(`Switched to network: ${this.walletManager.targetChain.name}`);
-        } catch (error) {
-            console.error('Error switching network:', error);
-        } finally {
-            switchNetworkButton.setText(originalText);  // Reset button text after interaction
-        }
-    });
-}
-
-
-    // Change scene logic (remains unchanged)
-    changeScene() {
-        if (this.logoTween) {
-            this.logoTween.stop();
-            this.logoTween = null;
-        }
-        this.scene.start('Game');
+            button.on('pointerdown', () => this.handleSubMenuAction(buttonConfig.event));
+            this.submenu.add(button);
+        });
     }
 
-    // Move logo logic (remains unchanged)
-    moveLogo(vueCallback: ({ x, y }: { x: number, y: number }) => void) {
-        if (this.logoTween) {
-            if (this.logoTween.isPlaying()) {
-                this.logoTween.pause();
-            } else {
-                this.logoTween.play();
-            }
-        } else {
-            this.logoTween = this.tweens.add({
-                targets: this.logo,
-                x: { value: 750, duration: 3000, ease: 'Back.easeInOut' },
-                y: { value: 80, duration: 1500, ease: 'Sine.easeOut' },
-                yoyo: true,
-                repeat: -1,
-                onUpdate: () => {
-                    if (vueCallback) {
-                        vueCallback({
-                            x: Math.floor(this.logo.x),
-                            y: Math.floor(this.logo.y)
-                        });
-                    }
+    // Handle submenu actions based on button text
+    private async handleSubMenuAction(action: string) {
+        switch (action) {
+            case 'viewBalance':
+                await this.executeWithLoading('viewBalance', 'Loading...', () => this.walletPlugin.getBalance().then(balance => {
+                    this.updateBalance(balance);
+                }));
+                break;
+            case 'sendTransaction':
+                const account = this.walletPlugin.getAccount();
+                if (account) {
+                    await this.executeWithLoading('sendTransaction', 'Sending...', () => this.walletPlugin.sendTransaction(account, "1"));
                 }
-            });
+                break;
+            case 'getBlockNumber':
+                await this.executeWithLoading('getBlockNumber', 'Fetching...', async () => {
+                    const blockNumber = await this.walletPlugin.getBlockNumber();
+                    console.log(`Current Block Number: ${blockNumber}`);
+                });
+                break;
+            case 'switchNetwork':
+                await this.executeWithLoading('switchNetwork', 'Switching...', () => this.walletPlugin.switchChain());
+                break;
+            default:
+                console.error(`Unknown action: ${action}`);
         }
     }
 }
+
+export default MainMenu;
