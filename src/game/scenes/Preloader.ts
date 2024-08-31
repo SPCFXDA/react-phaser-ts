@@ -35,6 +35,17 @@ export class Preloader extends Scene
 
         this.load.image('logo', 'logo.png');
         this.load.image('star', 'star.png');
+
+        this.load.setPath('assets/ui');
+
+        this.load.svg('buttonUP', 'button_rectangle_depth_flat.svg' );
+        this.load.svg('buttonDOWN', 'button_rectangle_flat.svg' );
+        this.load.svg('buttonDISABLED', 'button_rectangle_depth_gradient.svg' );
+        this.load.svg('buttonLOADING', 'button_rectangle_flat.svg' );
+
+        this.load.svg('buttonRoundUP', 'button_rectangle_depth_border.svg' );
+        this.load.svg('buttonRoundDOWN', 'button_rectangle_border.svg' );
+
     }
 
     create ()

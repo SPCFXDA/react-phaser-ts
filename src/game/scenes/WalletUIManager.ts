@@ -3,12 +3,14 @@ import { WalletPlugin } from '../plugins/WalletPlugin';
 import { EventBus } from '../EventBus';
 import { WalletUI } from './WalletUI';
 import { WalletActions } from './WalletActions';
+import { SelectionModal } from './SelectionModal'; // Import SelectionModal
 
 export class WalletUIManager {
     private scene: Scene;
     private walletPlugin: WalletPlugin;
     private walletUI: WalletUI;
     private walletActions: WalletActions;
+    private selectionModal: SelectionModal; // Add modal instance
 
     constructor(scene: Scene, walletPlugin: WalletPlugin) {
         this.scene = scene;
@@ -18,7 +20,10 @@ export class WalletUIManager {
         this.walletActions = new WalletActions(walletPlugin, this.updateUIWithWalletStatus.bind(this));
 
         // Link WalletUI with WalletActions to allow text updates
-        this.walletActions.setWalletUI(this.walletUI); // Add this line
+        this.walletActions.setWalletUI(this.walletUI);
+
+        // Initialize the selection modal
+        this.selectionModal = new SelectionModal(scene, 500, 500, this.handleModalConfirm.bind(this));
 
         this.setupEventListeners();
     }
@@ -28,7 +33,16 @@ export class WalletUIManager {
     }
 
     private async handleWalletConnection() {
-        await this.walletActions.handleWalletConnection();
+        // Show the selection modal to choose space and manager
+        this.selectionModal.show();
+    }
+
+    private handleModalConfirm(space: string, manager: string) {
+        // Proceed with wallet connection using the selected space and manager
+        this.walletPlugin.setCurrentSpace(space);
+        this.walletPlugin.setCurrentManager(manager);
+
+        this.walletActions.handleWalletConnection();
     }
 
     private async updateUIWithWalletStatus() {

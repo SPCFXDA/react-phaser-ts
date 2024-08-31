@@ -28,20 +28,23 @@ export class WalletActions {
         this.walletPlugin.setCurrentManager(managers[1]);
 
         if (this.walletPlugin.isWalletInstalled()) {
-            if (this.walletPlugin.currentAccount) {
-                await this.executeWithLoading('disconnectWallet', 'Disconnecting...', async () => {
-                    await this.walletPlugin.disconnectWallet();
-                    this.updateUIWithWalletStatus();
-                });
-            } else {
-                await this.executeWithLoading('connectWallet', 'Connecting...', async () => {
-                    await this.walletPlugin.connect();
-                    this.updateUIWithWalletStatus();
-                });
-            }
+            await this.connect()
         } else {
             console.error("Wallet is not installed");
         }
+    }
+    public async connect() {
+        await this.executeWithLoading('connectWallet', 'Connecting...', async () => {
+            await this.walletPlugin.connect();
+            this.updateUIWithWalletStatus();
+        });
+    }
+
+    public async disconnect() {
+        await this.executeWithLoading('disconnectWallet', 'Disconnecting...', async () => {
+            await this.walletPlugin.disconnectWallet();
+            this.updateUIWithWalletStatus();
+        });
     }
 
     public async updateBalanceInfo() {
