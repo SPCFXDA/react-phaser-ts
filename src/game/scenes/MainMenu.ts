@@ -128,67 +128,99 @@ export class MainMenu extends Scene {
     }
 
     // Create submenu with additional wallet options
-    createSubmenu() {
-        const viewBalanceButton = this.add.text(0, 0, 'View Balance', {
-            fontSize: '18px',
-            backgroundColor: '#444',
-            color: '#fff',
-            padding: { x: 8, y: 5 }
-        }).setInteractive();
+// Create submenu with additional wallet options
+createSubmenu() {
+    const viewBalanceButton = this.add.text(0, 0, 'View Balance', {
+        fontSize: '18px',
+        backgroundColor: '#444',
+        color: '#fff',
+        padding: { x: 8, y: 5 }
+    }).setInteractive();
 
-        const sendTransactionButton = this.add.text(0, 40, 'Send Transaction', {
-            fontSize: '18px',
-            backgroundColor: '#444',
-            color: '#fff',
-            padding: { x: 8, y: 5 }
-        }).setInteractive();
+    const sendTransactionButton = this.add.text(0, 40, 'Send Transaction', {
+        fontSize: '18px',
+        backgroundColor: '#444',
+        color: '#fff',
+        padding: { x: 8, y: 5 }
+    }).setInteractive();
 
-        const getBlockNumberButton = this.add.text(0, 80, 'Get Block Number', {
-            fontSize: '18px',
-            backgroundColor: '#444',
-            color: '#fff',
-            padding: { x: 8, y: 5 }
-        }).setInteractive();
+    const getBlockNumberButton = this.add.text(0, 80, 'Get Block Number', {
+        fontSize: '18px',
+        backgroundColor: '#444',
+        color: '#fff',
+        padding: { x: 8, y: 5 }
+    }).setInteractive();
 
-        const switchNetworkButton = this.add.text(0, 120, 'Switch Network', {
-            fontSize: '18px',
-            backgroundColor: '#444',
-            color: '#fff',
-            padding: { x: 8, y: 5 }
-        }).setInteractive();
+    const switchNetworkButton = this.add.text(0, 120, 'Switch Network', {
+        fontSize: '18px',
+        backgroundColor: '#444',
+        color: '#fff',
+        padding: { x: 8, y: 5 }
+    }).setInteractive();
 
-        // Add submenu items to container
-        this.submenu.add([viewBalanceButton, sendTransactionButton, getBlockNumberButton, switchNetworkButton]);
+    // Add submenu items to container
+    this.submenu.add([viewBalanceButton, sendTransactionButton, getBlockNumberButton, switchNetworkButton]);
 
-        // Logic to display balance when "View Balance" is clicked
-        viewBalanceButton.on('pointerdown', async () => {
+    // Logic to display balance when "View Balance" is clicked
+    viewBalanceButton.on('pointerdown', async () => {
+        const originalText = viewBalanceButton.text;  // Save original button text
+        viewBalanceButton.setText('Loading...');      // Set button to loading
+        try {
             const balance = await this.walletManager.getBalance();
             this.updateBalance(balance);
-        });
+        } catch (error) {
+            console.error('Error fetching balance:', error);
+        } finally {
+            viewBalanceButton.setText(originalText);  // Reset button text after interaction
+        }
+    });
 
-        // Logic to send a transaction when "Send Transaction" is clicked
-        sendTransactionButton.on('pointerdown', async () => {
-            // const toAccount = prompt("Enter recipient address:");
-            // const amount = prompt("Enter amount to send:");
-            const toAccount = this.walletManager.getAccount()
+    // Logic to send a transaction when "Send Transaction" is clicked
+    sendTransactionButton.on('pointerdown', async () => {
+        const originalText = sendTransactionButton.text;  // Save original button text
+        sendTransactionButton.setText('Loading...');      // Set button to loading
+        try {
+            const toAccount = this.walletManager.getAccount();
             if (toAccount) {
                 const txnHash = await this.walletManager.sendTransaction(toAccount, "1");
                 console.log(`Transaction hash: ${txnHash}`);
             }
-        });
+        } catch (error) {
+            console.error('Error sending transaction:', error);
+        } finally {
+            sendTransactionButton.setText(originalText);  // Reset button text after interaction
+        }
+    });
 
-        // Logic to get block number when "Get Block Number" is clicked
-        getBlockNumberButton.on('pointerdown', async () => {
+    // Logic to get block number when "Get Block Number" is clicked
+    getBlockNumberButton.on('pointerdown', async () => {
+        const originalText = getBlockNumberButton.text;  // Save original button text
+        getBlockNumberButton.setText('Loading...');      // Set button to loading
+        try {
             const blockNumber = await this.walletManager.getBlockNumber();
             console.log(`Current block number: ${blockNumber}`);
-        });
+        } catch (error) {
+            console.error('Error fetching block number:', error);
+        } finally {
+            getBlockNumberButton.setText(originalText);  // Reset button text after interaction
+        }
+    });
 
-        // Logic to switch network when "Switch Network" is clicked
-        switchNetworkButton.on('pointerdown', async () => {
+    // Logic to switch network when "Switch Network" is clicked
+    switchNetworkButton.on('pointerdown', async () => {
+        const originalText = switchNetworkButton.text;  // Save original button text
+        switchNetworkButton.setText('Loading...');      // Set button to loading
+        try {
             await this.walletManager.switchNetwork(this.walletManager.targetChain.id);
             console.log(`Switched to network: ${this.walletManager.targetChain.name}`);
-        });
-    }
+        } catch (error) {
+            console.error('Error switching network:', error);
+        } finally {
+            switchNetworkButton.setText(originalText);  // Reset button text after interaction
+        }
+    });
+}
+
 
     // Change scene logic (remains unchanged)
     changeScene() {
