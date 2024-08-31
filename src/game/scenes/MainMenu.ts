@@ -1,4 +1,4 @@
-import { GameObjects, Scene } from 'phaser';
+import { Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 import { WalletPlugin } from '../plugins/WalletPlugin';
 import { WalletUIManager } from './WalletUIManager.ts';
@@ -21,6 +21,7 @@ export class MainMenu extends Scene {
             return;
         }
         this.walletUIManager = new WalletUIManager(this, this.walletPlugin);
+        console.log(this.walletUIManager)
 
         EventBus.emit('current-scene-ready', this);
     }
