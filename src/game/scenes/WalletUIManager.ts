@@ -1,7 +1,6 @@
 import { Scene } from 'phaser';
 import { WalletPlugin } from '../plugins/WalletPlugin';
 import { EventBus } from '../EventBus';
-import { Address } from 'viem';
 import { WalletUI } from './WalletUI';
 import { WalletActions } from './WalletActions';
 
@@ -15,24 +14,23 @@ export class WalletUIManager {
         this.scene = scene;
         this.walletPlugin = walletPlugin;
 
-        // Pass the submenu action handler to WalletUI
         this.walletUI = new WalletUI(scene, this.handleWalletConnection.bind(this), this.handleSubMenuAction.bind(this));
         this.walletActions = new WalletActions(walletPlugin, this.updateUIWithWalletStatus.bind(this));
+
+        // Link WalletUI with WalletActions to allow text updates
+        this.walletActions.setWalletUI(this.walletUI); // Add this line
 
         this.setupEventListeners();
     }
 
-    // Set up event listeners for UI interactions
     private setupEventListeners() {
         EventBus.on('wallet-connection-changed', () => this.updateUIWithWalletStatus());
     }
 
-    // Handle wallet connection and update UI based on status
     private async handleWalletConnection() {
         await this.walletActions.handleWalletConnection();
     }
 
-    // Update the UI to reflect the current wallet status
     private async updateUIWithWalletStatus() {
         const account = this.walletPlugin.currentAccount;
         this.walletUI.updateAccountInfo(account);
@@ -45,7 +43,6 @@ export class WalletUIManager {
         }
     }
 
-    // Handle submenu actions based on button text
     private async handleSubMenuAction(action: string) {
         switch (action) {
             case 'viewBalance':

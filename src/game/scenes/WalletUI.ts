@@ -8,6 +8,7 @@ export class WalletUI {
     private connectText: Phaser.GameObjects.Text;
     private chainInfoText: Phaser.GameObjects.Text;
     private submenu: Phaser.GameObjects.Container;
+    private submenuButtons: Record<string, Phaser.GameObjects.Text> = {}; // Add this line
 
     constructor(scene: Scene, connectHandler: () => void, subMenuActionHandler: (action: string) => void) {
         this.scene = scene;
@@ -71,10 +72,20 @@ export class WalletUI {
                 padding: { x: 8, y: 5 }
             }).setInteractive();
 
-            // Pass the event handling responsibility to WalletUIManager
             button.on('pointerdown', () => subMenuActionHandler(buttonConfig.event));
             this.submenu.add(button);
+
+            // Store reference to button for updating text
+            this.submenuButtons[buttonConfig.event] = button; // Add this line
         });
+    }
+
+    // Method to update the text of a specific submenu button
+    public updateButtonText(action: string, text: string) {
+        const button = this.submenuButtons[action];
+        if (button) {
+            button.setText(text);
+        }
     }
 
     // Update the displayed account information
