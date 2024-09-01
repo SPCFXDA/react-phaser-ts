@@ -8,7 +8,7 @@ import { WalletPanel } from './ui/WalletPanel';
 export class WalletHUD {
     private scene: Scene;
     private walletPlugin: WalletPlugin;
-    private connectButton: ConnectWalletButton
+    private connectButton: ConnectWalletButton;
     private walletPanel: WalletPanel;
     private selectionModal: SelectionModal; // Add modal instance
 
@@ -16,12 +16,12 @@ export class WalletHUD {
         this.scene = scene;
         this.walletPlugin = walletPlugin;
 
-
         const centerX = this.scene.scale.width / 2;
         const centerY = this.scene.scale.height / 2;
+
         // Initialize the selection modal with the walletPlugin
         this.selectionModal = new SelectionModal(scene, centerX, centerY, walletPlugin, this.handleModalConfirm.bind(this), this.handleModalCancel.bind(this));
-        this.connectButton = new ConnectWalletButton(scene, centerX, centerY, ()=> {
+        this.connectButton = new ConnectWalletButton(scene, centerX, centerY, () => {
             this.connectButton.setVisible(false);
             this.selectionModal.setVisible(true);
         });
@@ -29,8 +29,7 @@ export class WalletHUD {
         this.setupEventListeners();
 
         this.walletPanel = new WalletPanel(scene, this.scene.scale.width - 235, 60, walletPlugin, this.updateUIWithWalletStatus.bind(this));
-        this.walletPanel.setVisible(false)
-
+        this.walletPanel.setVisible(false);
     }
 
     private setupEventListeners() {
@@ -38,8 +37,7 @@ export class WalletHUD {
     }
 
     private handleModalCancel() {
-        this.connectButton.setVisible(true)
-
+        this.connectButton.setVisible(true);
     }
 
     private handleModalConfirm(space: string, managerName: string) {
@@ -47,36 +45,40 @@ export class WalletHUD {
             // Set the current space
             this.walletPlugin.setCurrentSpace(space as 'core' | 'espace');
 
-            // Find the manager object by its name and set it as the current manager
-            const managers = this.walletPlugin.getAvailableManagers();
-            const selectedManager = managers.find(mgr => mgr.constructor.name === managerName);
-
-            if (selectedManager) {
-                this.walletPlugin.setCurrentManager(selectedManager);
-                this.walletPlugin.connect().then(_account => {
-                    this.updateUIWithWalletStatus()
-                })
+            // Set the current manager based on the name
+            if (managerName === 'MetaMask') {
+                this.walletPlugin.setCurrentManager('MetaMask');
+            } else if (managerName === 'Fluent') {
+                this.walletPlugin.setCurrentManager('Fluent');
             } else {
-                console.error(`Manager with name ${managerName} not found`);
+                throw new Error(`Unknown manager type: ${managerName}`);
             }
+
+            // Attempt to connect with the selected manager
+            this.walletPlugin.connect().then(_account => {
+                this.updateUIWithWalletStatus();
+            }).catch(error => {
+                console.error('Error connecting to wallet:', error);
+                this.connectButton.setVisible(true); // Re-show the connect button on error
+            });
         } catch (error) {
             console.error('Error setting space or manager:', error);
+            this.connectButton.setVisible(true); // Re-show the connect button on error
         }
-        this.connectButton.setVisible(true)
     }
 
     private async updateUIWithWalletStatus() {
         const account = this.walletPlugin.currentAccount;
         if (account) {
-            this.connectButton.setVisible(false)
-            this.walletPanel.setVisible(true)
-            this.walletPanel.updateAccountInfo(account)
+            this.connectButton.setVisible(false);
+            this.walletPanel.setVisible(true);
+            this.walletPanel.updateAccountInfo(account);
             const chain = this.walletPlugin.getChainInfo();
             this.walletPanel.updateChainInfo(chain?.name || '');
         } else {
-            this.connectButton.setVisible(true)
-            this.walletPanel.setVisible(false)
-            this.walletPanel.updateAccountInfo('')
+            this.connectButton.setVisible(true);
+            this.walletPanel.setVisible(false);
+            this.walletPanel.updateAccountInfo('');
             this.walletPanel.updateChainInfo('');
         }
     }

@@ -6,10 +6,14 @@ declare const window: any;
 
 export class FluentWalletManager extends BaseWalletManager {
     private fluent: any;
+    private accountChangedListener: (accounts: Address[]) => void;
+    private chainChangedListener: (chainId: string) => void;
 
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
         this.fluent = window.fluent && window.fluent.isFluent ? window.fluent : null;
+        this.accountChangedListener = () => {}; // Initial dummy function
+        this.chainChangedListener = () => {}; // Initial dummy function
     }
 
     async getTransactionReceipt(txHash: string) {
@@ -19,11 +23,11 @@ export class FluentWalletManager extends BaseWalletManager {
             return null;
         }
 
-        return await this.publicClient.getTransactionReceipt(txHash)
+        return await this.publicClient.getTransactionReceipt(txHash);
     }
 
     getChainInfo() {
-        return confluxESpace
+        return confluxESpace;
     }
 
     isWalletInstalled(): boolean {
@@ -38,7 +42,7 @@ export class FluentWalletManager extends BaseWalletManager {
         }
 
         try {
-            const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' })
+            const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' });
             this.publicClient = createPublicClient({ transport: custom(this.fluent) });
             this.walletClient = createWalletClient({ account: account, chain: confluxESpace, transport: custom(this.fluent) });
             const accounts = await this.walletClient.requestAddresses();
@@ -47,7 +51,6 @@ export class FluentWalletManager extends BaseWalletManager {
                 this.game.events.emit('fluentError', 'No accounts found.');
                 return;
             }
-            // await this.walletClient.switchChain({ id: confluxESpace.id });
 
             this.currentAccount = account;
             const chainId = await this.walletClient.getChainId();
@@ -55,8 +58,8 @@ export class FluentWalletManager extends BaseWalletManager {
 
             console.log('Connected to Fluent:', this.currentAccount, this.currentChainId);
             this.setupListeners();
-            // await this.walletClient.switchChain({ id: confluxESpace.id });
-            if(chainId !== confluxESpace.id) {
+
+            if (chainId !== confluxESpace.id) {
                 await this.walletClient?.switchChain({ id: confluxESpace.id });
             }
             this.game.events.emit('walletConnected', this.currentAccount, this.currentChainId);
@@ -71,6 +74,7 @@ export class FluentWalletManager extends BaseWalletManager {
     disconnectWallet(): void {
         this.currentAccount = null;
         this.currentChainId = null;
+        this.removeListeners(); // Remove listeners on disconnection
         console.log('Wallet disconnected');
         this.game.events.emit('walletDisconnected');
     }
@@ -136,7 +140,8 @@ export class FluentWalletManager extends BaseWalletManager {
     setupListeners(): void {
         if (!this.fluent || !this.walletClient) return;
 
-        this.fluent.on('accountsChanged', (accounts: Address[]) => {
+        // Define listeners
+        this.accountChangedListener = (accounts: Address[]) => {
             if (accounts.length === 0) {
                 console.error('No accounts connected');
                 this.disconnectWallet();
@@ -145,15 +150,25 @@ export class FluentWalletManager extends BaseWalletManager {
                 console.log('Account changed:', this.currentAccount);
                 this.game.events.emit('accountChanged', this.currentAccount);
             }
-        });
+        };
 
-        this.fluent.on('chainChanged', async (chainId: string) => {
+        this.chainChangedListener = async (chainId: string) => {
             this.currentChainId = chainId;
             console.log('Network changed:', this.currentChainId);
-
             await this.walletClient?.switchChain({ id: confluxESpace.id });
-
             this.game.events.emit('chainChanged', this.currentChainId);
-        });
+        };
+
+        // Add listeners
+        this.fluent.on('accountsChanged', this.accountChangedListener);
+        this.fluent.on('chainChanged', this.chainChangedListener);
+    }
+
+    removeListeners(): void {
+        if (!this.fluent) return;
+
+        // Remove listeners
+        this.fluent.removeListener('accountsChanged', this.accountChangedListener);
+        this.fluent.removeListener('chainChanged', this.chainChangedListener);
     }
 }

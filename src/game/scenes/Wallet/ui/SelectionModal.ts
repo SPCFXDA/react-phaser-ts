@@ -98,21 +98,22 @@ export class SelectionModal extends GameObjects.Container {
         }
         const managers = this.walletPlugin.getAvailableManagers();
         this.managerOptions = managers.map((manager, index) => {
-            const option = this.scene.add.text(-180, 20 + (index * 30), manager.constructor.name, {
+            const managerName = manager; // Assuming managers have distinct constructor names
+            const option = this.scene.add.text(-180, 20 + (index * 30), managerName, {
                 fontSize: '16px',
                 backgroundColor: '#333',
                 color: '#ffffff',
                 padding: { x: 10, y: 5 }
             }).setInteractive();
 
-            option.on('pointerdown', () => this.selectManager(manager.constructor.name));
+            option.on('pointerdown', () => this.selectManager(managerName));
             this.add(option);
             return option;
         });
 
         // Automatically select the first manager
         if (managers.length > 0) {
-            this.selectManager(managers[0].constructor.name);
+            this.selectManager(managers[0]);
         }
     }
 
@@ -129,15 +130,10 @@ export class SelectionModal extends GameObjects.Container {
     }
 
     private selectManager(managerName: string) {
-        const managers = this.walletPlugin.getAvailableManagers();
-        const selectedManager = managers.find((mgr) => mgr.constructor.name === managerName);
-        if (selectedManager) {
-            this.selectedManager = managerName;
-            this.walletPlugin.setCurrentManager(selectedManager);
-            this.managerOptions.forEach(option => {
-                option.setBackgroundColor(option.text === managerName ? '#555' : '#333');
-            });
-        }
+        this.selectedManager = managerName;
+        this.managerOptions.forEach(option => {
+            option.setBackgroundColor(option.text === managerName ? '#555' : '#333');
+        });
     }
 
     private clearManagerOptions() {
@@ -172,7 +168,7 @@ export class SelectionModal extends GameObjects.Container {
 
         const managers = this.walletPlugin.getAvailableManagers();
         if (managers.length > 0) {
-            this.selectManager(managers[0].constructor.name);
+            this.selectManager(managers[0]);
         }
     }
 }

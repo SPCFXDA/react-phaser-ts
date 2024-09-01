@@ -6,10 +6,14 @@ declare const window: any;
 
 export class MetaMaskWalletManager extends BaseWalletManager {
     private metamask: any;
+    private accountChangedListener: (accounts: Address[]) => void;
+    private chainChangedListener: (chainId: string) => void;
 
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
         this.metamask = window.ethereum && window.ethereum.isMetaMask ? window.ethereum : null;
+        this.accountChangedListener = () => {}; // Initial dummy function
+        this.chainChangedListener = () => {}; // Initial dummy function
     }
 
     async getTransactionReceipt(txHash: string) {
@@ -19,11 +23,11 @@ export class MetaMaskWalletManager extends BaseWalletManager {
             return null;
         }
 
-        return await this.publicClient.getTransactionReceipt(txHash)
+        return await this.publicClient.getTransactionReceipt(txHash);
     }
 
     getChainInfo() {
-        return confluxESpace
+        return confluxESpace;
     }
 
     isWalletInstalled(): boolean {
@@ -38,9 +42,9 @@ export class MetaMaskWalletManager extends BaseWalletManager {
         }
 
         try {
-            const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' })
+            const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' });
             this.publicClient = createPublicClient({ transport: custom(this.metamask) });
-            this.walletClient = createWalletClient({ account: account,chain: confluxESpace, transport: custom(this.metamask) });
+            this.walletClient = createWalletClient({ account: account, chain: confluxESpace, transport: custom(this.metamask) });
             const accounts = await this.walletClient.requestAddresses();
             if (accounts.length === 0) {
                 console.error('No accounts found');
@@ -51,12 +55,11 @@ export class MetaMaskWalletManager extends BaseWalletManager {
             this.currentAccount = account;
             const chainId = await this.walletClient.getChainId();
             this.currentChainId = chainId.toString();
-            if(chainId !== confluxESpace.id) {
+            if (chainId !== confluxESpace.id) {
                 await this.walletClient?.switchChain({ id: confluxESpace.id });
             }
             console.log('Connected to MetaMask:', this.currentAccount, this.currentChainId);
             this.setupListeners();
-            // await this.walletClient.switchChain({ id: confluxESpace.id });
 
             this.game.events.emit('walletConnected', this.currentAccount, this.currentChainId);
             return this.currentAccount as Address;
@@ -70,6 +73,7 @@ export class MetaMaskWalletManager extends BaseWalletManager {
     disconnectWallet(): void {
         this.currentAccount = null;
         this.currentChainId = null;
+        this.removeListeners(); // Remove listeners on disconnection
         console.log('Wallet disconnected');
         this.game.events.emit('walletDisconnected');
     }
@@ -135,7 +139,8 @@ export class MetaMaskWalletManager extends BaseWalletManager {
     setupListeners(): void {
         if (!this.metamask || !this.walletClient) return;
 
-        this.metamask.on('accountsChanged', (accounts: Address[]) => {
+        // Define listeners
+        this.accountChangedListener = (accounts: Address[]) => {
             if (accounts.length === 0) {
                 console.error('No accounts connected');
                 this.disconnectWallet();
@@ -144,17 +149,25 @@ export class MetaMaskWalletManager extends BaseWalletManager {
                 console.log('Account changed:', this.currentAccount);
                 this.game.events.emit('accountChanged', this.currentAccount);
             }
-        });
+        };
 
-  
-
-        this.metamask.on('chainChanged', async (chainId: string) => {
+        this.chainChangedListener = async (chainId: string) => {
             this.currentChainId = chainId;
             console.log('Network changed:', this.currentChainId);
-
             await this.walletClient?.switchChain({ id: confluxESpace.id });
-
             this.game.events.emit('chainChanged', this.currentChainId);
-        });
+        };
+
+        // Add listeners
+        this.metamask.on('accountsChanged', this.accountChangedListener);
+        this.metamask.on('chainChanged', this.chainChangedListener);
+    }
+
+    removeListeners(): void {
+        if (!this.metamask) return;
+
+        // Remove listeners
+        this.metamask.removeListener('accountsChanged', this.accountChangedListener);
+        this.metamask.removeListener('chainChanged', this.chainChangedListener);
     }
 }

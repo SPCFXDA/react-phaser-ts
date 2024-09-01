@@ -1,16 +1,19 @@
 import { Address, createPublicClient, createWalletClient, custom, formatCFX, parseCFX } from 'cive';
-import { mainnet} from 'cive/chains'
-
+import { mainnet } from 'cive/chains';
 import { BaseWalletManager } from './BaseWalletManager';
 
 declare const window: any;
 
 export class FluentWalletManagerCore extends BaseWalletManager {
     private fluentCore: any;
+    private accountChangedListener: (accounts: Address[]) => void;
+    private chainChangedListener: (chainId: string) => void;
 
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
         this.fluentCore = window.conflux && window.conflux.isFluent ? window.conflux : null;
+        this.accountChangedListener = () => {}; // Initial dummy function
+        this.chainChangedListener = () => {}; // Initial dummy function
     }
 
     async getTransactionReceipt(txHash: string) {
@@ -20,11 +23,11 @@ export class FluentWalletManagerCore extends BaseWalletManager {
             return null;
         }
 
-        return await this.publicClient.getTransactionReceipt(txHash)
+        return await this.publicClient.getTransactionReceipt(txHash);
     }
 
     getChainInfo() {
-        return mainnet
+        return mainnet;
     }
 
     isWalletInstalled(): boolean {
@@ -42,8 +45,7 @@ export class FluentWalletManagerCore extends BaseWalletManager {
             const accounts = await this.fluentCore.request({ method: 'cfx_requestAccounts' });
             this.publicClient = createPublicClient({ transport: custom(this.fluentCore) });
             this.walletClient = createWalletClient({ account: accounts[0], chain: mainnet, transport: custom(this.fluentCore) });
-            // await this.walletClient.switchChain({ id: mainnet.id }) 
-            // const accounts = await this.walletClient.requestAddresses();
+
             if (accounts.length === 0) {
                 console.error('No accounts found');
                 this.game.events.emit('fluentError', 'No accounts found.');
@@ -56,8 +58,8 @@ export class FluentWalletManagerCore extends BaseWalletManager {
 
             console.log('Connected to Fluent:', this.currentAccount, this.currentChainId);
             this.setupListeners();
-            // await this.walletClient.switchChain({ id: mainnet.id });
-            if(chainId !== mainnet.id) {
+
+            if (chainId !== mainnet.id) {
                 await this.walletClient?.switchChain({ id: mainnet.id });
             }
             this.game.events.emit('walletConnected', this.currentAccount, this.currentChainId);
@@ -72,6 +74,7 @@ export class FluentWalletManagerCore extends BaseWalletManager {
     disconnectWallet(): void {
         this.currentAccount = null;
         this.currentChainId = null;
+        this.removeListeners(); // Remove listeners on disconnection
         console.log('Wallet disconnected');
         this.game.events.emit('walletDisconnected');
     }
@@ -137,25 +140,36 @@ export class FluentWalletManagerCore extends BaseWalletManager {
     setupListeners(): void {
         if (!this.fluentCore || !this.walletClient) return;
 
-        this.fluentCore.on('accountsChanged', (accounts: Address[]) => {
+        // Define listeners
+        this.accountChangedListener = (accounts: Address[]) => {
             if (accounts.length === 0) {
                 console.error('No accounts connected');
                 this.disconnectWallet();
             } else {
-                const account = accounts[0] as Address
+                const account = accounts[0] as Address;
                 this.currentAccount = account;
                 console.log('Account changed:', this.currentAccount);
                 this.game.events.emit('accountChanged', this.currentAccount);
             }
-        });
+        };
 
-        this.fluentCore.on('chainChanged', async (chainId: string) => {
+        this.chainChangedListener = async (chainId: string) => {
             this.currentChainId = chainId;
             console.log('Network changed:', this.currentChainId);
-
             await this.walletClient?.switchChain({ id: mainnet.id });
-
             this.game.events.emit('chainChanged', this.currentChainId);
-        });
+        };
+
+        // Add listeners
+        this.fluentCore.on('accountsChanged', this.accountChangedListener);
+        this.fluentCore.on('chainChanged', this.chainChangedListener);
+    }
+
+    removeListeners(): void {
+        if (!this.fluentCore) return;
+
+        // Remove listeners
+        this.fluentCore.removeListener('accountsChanged', this.accountChangedListener);
+        this.fluentCore.removeListener('chainChanged', this.chainChangedListener);
     }
 }
