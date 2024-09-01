@@ -1,11 +1,11 @@
 import { Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 import { WalletPlugin } from '../plugins/WalletPlugin';
-import { WalletUIManager } from './WalletUIManager.ts';
+import { WalletHUD } from './Wallet/WalletHUD';
 
 export class MainMenu extends Scene {
     private walletPlugin: WalletPlugin;
-    private walletUIManager: WalletUIManager;
+    private walletHUD: WalletHUD;
     constructor() {
         super('MainMenu');
     }
@@ -20,8 +20,7 @@ export class MainMenu extends Scene {
             console.error('WalletPlugin not found');
             return;
         }
-        this.walletUIManager = new WalletUIManager(this, this.walletPlugin);
-        console.log(this.walletUIManager)
+        this.walletHUD = new WalletHUD(this, this.walletPlugin);
 
         EventBus.emit('current-scene-ready', this);
     }
