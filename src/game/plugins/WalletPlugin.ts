@@ -12,8 +12,8 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
     private fluentWalletManager: FluentWalletManager;
     private fluentWalletManagerCore: FluentWalletManagerCore;
     private currentManager: WalletManager | null = null;
-    private currentSpace: 'core' | 'espace' | null;
-    currentAccount: Address | null;
+    private currentSpace: 'core' | 'espace' | null = null;
+    currentAccount: Address | null = null;
     private spaceManagers: { [key: string]: WalletManager[] };
 
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
@@ -21,8 +21,6 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
         this.metaMaskWalletManager = new MetaMaskWalletManager(pluginManager);
         this.fluentWalletManager = new FluentWalletManager(pluginManager);
         this.fluentWalletManagerCore = new FluentWalletManagerCore(pluginManager);
-        this.currentAccount = null;
-        this.currentSpace = null;
 
         this.spaceManagers = {
             espace: [this.metaMaskWalletManager, this.fluentWalletManager],
@@ -39,6 +37,7 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
     setCurrentSpace(space: 'core' | 'espace'): void {
         if (space in this.spaceManagers) {
             this.currentSpace = space;
+            this.currentManager = null; // Clear current manager when changing space
         } else {
             throw new Error('Invalid space type');
         }
@@ -53,13 +52,27 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
         return this.spaceManagers[this.currentSpace];
     }
 
-    // Set the current manager (MetaMask or Fluent)
+    // Set the current manager and clean up the previous one
     setCurrentManager(manager: WalletManager): void {
         if (!this.currentSpace || !this.spaceManagers[this.currentSpace].includes(manager)) {
             throw new Error('Invalid or unavailable wallet manager type');
         }
+        
+        // Cleanup the previous manager
+        if (this.currentManager) {
+            this.cleanupCurrentManager();
+        }
+        
         this.currentManager = manager;
         console.log(`Current manager set to: ${manager.constructor.name}`);
+    }
+
+    // Cleanup the currently active manager
+    private cleanupCurrentManager(): void {
+        if (this.currentManager) {
+            this.currentManager.disconnectWallet(); // Or any specific cleanup needed
+            this.currentAccount = null;
+        }
     }
 
     getChainInfo() {
@@ -79,11 +92,9 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
         }
     }
 
-    // Wrapper methods that delegate to the current manager
-
     async connect(): Promise<Address | null> {
         this.ensureManagerSet();
-        this.currentAccount = await this.currentManager?.connect() as unknown as Address;
+        this.currentAccount = await this.currentManager?.connect() as Address | null;
         return this.currentAccount;
     }
 
@@ -95,7 +106,7 @@ export class WalletPlugin extends Phaser.Plugins.BasePlugin {
 
     async getAccount(): Promise<Address | undefined> {
         this.ensureManagerSet();
-        return this.currentManager?.getAccount() || undefined;
+        return this.currentManager?.getAccount();
     }
 
     async getBalance(): Promise<string | null> {

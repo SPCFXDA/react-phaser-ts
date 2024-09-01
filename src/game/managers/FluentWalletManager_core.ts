@@ -1,15 +1,16 @@
-import { Address, createPublicClient, createWalletClient, custom, formatEther, parseEther } from 'viem';
-import { confluxESpace } from 'viem/chains';
+import { Address, createPublicClient, createWalletClient, custom, formatCFX, parseCFX } from 'cive';
+import { mainnet} from 'cive/chains'
+
 import { BaseWalletManager } from './BaseWalletManager';
 
 declare const window: any;
 
 export class FluentWalletManagerCore extends BaseWalletManager {
-    private fluent: any;
+    private fluentCore: any;
 
     constructor(pluginManager: Phaser.Plugins.PluginManager) {
         super(pluginManager);
-        this.fluent = window.fluent && window.fluent.isFluent ? window.fluent : null;
+        this.fluentCore = window.conflux && window.conflux.isFluent ? window.conflux : null;
     }
 
     async getTransactionReceipt(txHash: string) {
@@ -23,11 +24,11 @@ export class FluentWalletManagerCore extends BaseWalletManager {
     }
 
     getChainInfo() {
-        return confluxESpace
+        return mainnet
     }
 
     isWalletInstalled(): boolean {
-        return !!this.fluent;
+        return !!this.fluentCore;
     }
 
     async connect(): Promise<Address | undefined> {
@@ -38,9 +39,11 @@ export class FluentWalletManagerCore extends BaseWalletManager {
         }
 
         try {
-            this.publicClient = createPublicClient({ transport: custom(this.fluent) });
-            this.walletClient = createWalletClient({ chain: confluxESpace, transport: custom(this.fluent) });
-            const accounts = await this.walletClient.requestAddresses();
+            const accounts = await this.fluentCore.request({ method: 'cfx_requestAccounts' });
+            this.publicClient = createPublicClient({ transport: custom(this.fluentCore) });
+            this.walletClient = createWalletClient({ account: accounts[0], chain: mainnet, transport: custom(this.fluentCore) });
+            // await this.walletClient.switchChain({ id: mainnet.id }) 
+            // const accounts = await this.walletClient.requestAddresses();
             if (accounts.length === 0) {
                 console.error('No accounts found');
                 this.game.events.emit('fluentError', 'No accounts found.');
@@ -53,8 +56,10 @@ export class FluentWalletManagerCore extends BaseWalletManager {
 
             console.log('Connected to Fluent:', this.currentAccount, this.currentChainId);
             this.setupListeners();
-            await this.walletClient.switchChain({ id: confluxESpace.id });
-
+            // await this.walletClient.switchChain({ id: mainnet.id });
+            if(chainId !== mainnet.id) {
+                await this.walletClient?.switchChain({ id: mainnet.id });
+            }
             this.game.events.emit('walletConnected', this.currentAccount, this.currentChainId);
             return this.currentAccount as Address;
         } catch (error) {
@@ -80,7 +85,7 @@ export class FluentWalletManagerCore extends BaseWalletManager {
 
         try {
             const balance = await this.publicClient.getBalance({ address: this.currentAccount });
-            const formattedBalance = formatEther(balance);
+            const formattedBalance = formatCFX(balance);
             this.game.events.emit('balanceUpdated', formattedBalance);
             return formattedBalance;
         } catch (error) {
@@ -101,7 +106,7 @@ export class FluentWalletManagerCore extends BaseWalletManager {
             const txnResponse = await this.walletClient.sendTransaction({
                 account: this.currentAccount,
                 to: toAccount,
-                value: parseEther(amount.toString()),
+                value: parseCFX(amount.toString()),
             });
 
             this.game.events.emit('transactionSent', txnResponse.hash);
@@ -120,9 +125,9 @@ export class FluentWalletManagerCore extends BaseWalletManager {
         }
 
         try {
-            const blockNumber = await this.publicClient.getBlockNumber();
-            this.game.events.emit('blockNumberUpdated', blockNumber);
-            return blockNumber;
+            const block = await this.publicClient.getBlock();
+            this.game.events.emit('blockNumberUpdated', block.blockNumber);
+            return block.blockNumber;
         } catch (error) {
             console.error('Error fetching block number:', error);
             this.game.events.emit('fluentError', 'Error fetching block number.');
@@ -130,24 +135,25 @@ export class FluentWalletManagerCore extends BaseWalletManager {
     }
 
     setupListeners(): void {
-        if (!this.fluent || !this.walletClient) return;
+        if (!this.fluentCore || !this.walletClient) return;
 
-        this.fluent.on('accountsChanged', (accounts: Address[]) => {
+        this.fluentCore.on('accountsChanged', (accounts: Address[]) => {
             if (accounts.length === 0) {
                 console.error('No accounts connected');
                 this.disconnectWallet();
             } else {
-                this.currentAccount = accounts[0];
+                const account = accounts[0] as Address
+                this.currentAccount = account;
                 console.log('Account changed:', this.currentAccount);
                 this.game.events.emit('accountChanged', this.currentAccount);
             }
         });
 
-        this.fluent.on('chainChanged', async (chainId: string) => {
+        this.fluentCore.on('chainChanged', async (chainId: string) => {
             this.currentChainId = chainId;
             console.log('Network changed:', this.currentChainId);
 
-            await this.walletClient?.switchChain({ id: confluxESpace.id });
+            await this.walletClient?.switchChain({ id: mainnet.id });
 
             this.game.events.emit('chainChanged', this.currentChainId);
         });

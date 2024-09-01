@@ -38,23 +38,27 @@ export class FluentWalletManager extends BaseWalletManager {
         }
 
         try {
+            const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' })
             this.publicClient = createPublicClient({ transport: custom(this.fluent) });
-            this.walletClient = createWalletClient({ chain: confluxESpace, transport: custom(this.fluent) });
+            this.walletClient = createWalletClient({ account: account, chain: confluxESpace, transport: custom(this.fluent) });
             const accounts = await this.walletClient.requestAddresses();
             if (accounts.length === 0) {
                 console.error('No accounts found');
                 this.game.events.emit('fluentError', 'No accounts found.');
                 return;
             }
+            // await this.walletClient.switchChain({ id: confluxESpace.id });
 
-            this.currentAccount = accounts[0];
+            this.currentAccount = account;
             const chainId = await this.walletClient.getChainId();
             this.currentChainId = chainId.toString();
 
             console.log('Connected to Fluent:', this.currentAccount, this.currentChainId);
             this.setupListeners();
-            await this.walletClient.switchChain({ id: confluxESpace.id });
-
+            // await this.walletClient.switchChain({ id: confluxESpace.id });
+            if(chainId !== confluxESpace.id) {
+                await this.walletClient?.switchChain({ id: confluxESpace.id });
+            }
             this.game.events.emit('walletConnected', this.currentAccount, this.currentChainId);
             return this.currentAccount as Address;
         } catch (error) {
