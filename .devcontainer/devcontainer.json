@@ -1,0 +1,49 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
+{
+	"name": "Conflux DevKit",
+	"image": "spcfxda/conflux-devkit-hardhat",
+	// "build": {
+	// 	"context": ".",
+	// 	"dockerfile": "Dockerfile",
+	// 	"args": {
+	// 		// "BASE_IMAGE": "node:20-slim",
+	// 		// "CONFLUX_NODE_ROOT": "/opt/conflux",
+	// 		// "USERNAME": "conflux",
+	// 		// "USER_UID": "1001"
+	// 		// "USER_GID": "1001"
+	// 	},	  
+	// 	"target": "devkit-hardhat" 
+	// },
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [
+		3000,
+		12535,
+		12537,
+		8545,
+		8546,
+		8080
+	]
+	// "customizations": {
+	// 	"vscode": {
+	// 		"extensions": [
+	// 			"NomicFoundation.hardhat-solidity"
+	// 		]
+	// 	}
+	// }
+
+	// Uncomment the next line to run commands after the container is created.
+	// "postCreateCommand": "cat /etc/os-release",
+	// "postAttachCommand":  "devkit wallet mnemonic configure && sleep 1"
+	// "postAttachCommand":  "touch ~/.devkit.keystore"
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "devcontainer"
+}
